@@ -1,0 +1,60 @@
+[Unit]
+Description=Watercooler Manager Daemon
+Documentation=https://github.com/tomups/watercooler-manager
+After=bluetooth.service
+Wants=bluetooth.service
+StartLimitIntervalSec=60
+StartLimitBurst=3
+
+[Service]
+Type=simple
+User=watercooler
+Group=watercooler
+ExecStart=/usr/bin/watercooler-manager-daemon
+Restart=on-failure
+RestartSec=5
+TimeoutStartSec=30
+TimeoutStopSec=10
+
+# Security settings - Updated for 2024 best practices
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=false
+ProtectHostname=true
+ProtectClock=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+RemoveIPC=true
+PrivateMounts=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+RestrictNamespaces=true
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallFilter=~@debug @mount @cpu-emulation @obsolete @privileged @reboot @swap
+
+# Allow access to configuration and logs
+ReadWritePaths=/etc/watercooler-manager
+ReadWritePaths=/var/log/watercooler-manager
+
+# Allow access to Bluetooth devices
+SupplementaryGroups=bluetooth
+
+# Environment
+Environment=PYTHONUNBUFFERED=1
+Environment=WATERCOOLER_DAEMON_MODE=1
+Environment=WATERCOOLER_CONFIG_PATH=/etc/watercooler-manager/config.json
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=watercooler-manager
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,29 @@
+[Unit]
+Description=Watercooler Manager (User Session)
+Documentation=https://github.com/tomups/watercooler-manager
+After=graphical-session.target bluetooth.service
+Wants=bluetooth.service
+StartLimitIntervalSec=60
+StartLimitBurst=3
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/watercooler-manager
+Restart=on-failure
+RestartSec=5
+TimeoutStartSec=30
+TimeoutStopSec=10
+
+# Environment for GUI applications
+Environment=DISPLAY=:0
+Environment=WAYLAND_DISPLAY=wayland-0
+Environment=XDG_RUNTIME_DIR=%i
+Environment=PYTHONUNBUFFERED=1
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=watercooler-manager-user
+
+[Install]
+WantedBy=default.target

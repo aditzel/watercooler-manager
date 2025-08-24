@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE policyconfig PUBLIC
+ "-//freedesktop//DTD PolicyKit Policy Configuration 1.0//EN"
+ "http://www.freedesktop.org/standards/PolicyKit/1.0/policyconfig.dtd">
+
+<policyconfig>
+  <vendor>Watercooler Manager</vendor>
+  <vendor_url>https://github.com/tomups/watercooler-manager</vendor_url>
+  <icon_name>watercooler-manager</icon_name>
+
+  <action id="org.watercooler.manager.bluetooth-access">
+    <description>Access Bluetooth devices for watercooler management</description>
+    <message>Authentication is required to access Bluetooth devices for watercooler management</message>
+    <defaults>
+      <allow_any>no</allow_any>
+      <allow_inactive>no</allow_inactive>
+      <allow_active>auth_self_keep</allow_active>
+    </defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/bin/watercooler-manager</annotate>
+  </action>
+
+  <action id="org.watercooler.manager.daemon-control">
+    <description>Control watercooler manager daemon</description>
+    <message>Authentication is required to control the watercooler manager daemon</message>
+    <defaults>
+      <allow_any>no</allow_any>
+      <allow_inactive>no</allow_inactive>
+      <allow_active>auth_admin_keep</allow_active>
+    </defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/bin/systemctl</annotate>
+  </action>
+
+  <action id="org.watercooler.manager.config-write">
+    <description>Write watercooler manager configuration</description>
+    <message>Authentication is required to modify watercooler manager configuration</message>
+    <defaults>
+      <allow_any>no</allow_any>
+      <allow_inactive>no</allow_inactive>
+      <allow_active>auth_admin</allow_active>
+    </defaults>
+  </action>
+</policyconfig>

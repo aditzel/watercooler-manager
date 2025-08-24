@@ -1,0 +1,11 @@
+{
+    "current_voltage": 7,
+    "current_fan_speed": 50,
+    "pump_is_off": false,
+    "fan_is_off": false,
+    "rgb_state": 1,
+    "rgb_is_off": false,
+    "rgb_color": [255, 0, 0],
+    "auto_start": true,
+    "auto_connect": true
+}

@@ -1,0 +1,23 @@
+# udev rules for Watercooler Manager
+# Allows access to Bluetooth devices for watercooler management
+
+# Generic Bluetooth Low Energy devices
+SUBSYSTEM=="usb", ATTRS{idVendor}=="*", ATTRS{idProduct}=="*", MODE="0664", GROUP="bluetooth"
+
+# Allow watercooler group to access Bluetooth devices
+KERNEL=="hci[0-9]*", GROUP="bluetooth", MODE="0664"
+
+# Allow access to Bluetooth RFCOMM devices
+KERNEL=="rfcomm[0-9]*", GROUP="bluetooth", MODE="0664"
+
+# Create watercooler group and add user permissions
+ACTION=="add", SUBSYSTEM=="bluetooth", RUN+="/bin/sh -c 'getent group watercooler || groupadd -r watercooler'"
+
+# Set permissions for Bluetooth adapters
+ACTION=="add", SUBSYSTEM=="bluetooth", KERNEL=="hci[0-9]*", RUN+="/bin/chmod 664 /dev/$kernel", RUN+="/bin/chgrp bluetooth /dev/$kernel"
+
+# Allow members of bluetooth group to access Bluetooth devices
+SUBSYSTEM=="bluetooth", GROUP="bluetooth", MODE="0664"
+
+# Tag devices for systemd
+SUBSYSTEM=="bluetooth", TAG+="systemd"

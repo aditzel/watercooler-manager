@@ -1,0 +1,70 @@
+#!/bin/bash
+# Watercooler Manager Daemon Wrapper Script
+
+set -euo pipefail
+
+# Configuration
+CONFIG_PATH="${WATERCOOLER_CONFIG_PATH:-/etc/watercooler-manager/config.json}"
+LOG_DIR="/var/log/watercooler-manager"
+LOG_FILE="${LOG_DIR}/watercooler-manager.log"
+PID_FILE="/run/watercooler-manager/watercooler-manager.pid"
+
+# Ensure log directory exists
+mkdir -p "${LOG_DIR}"
+mkdir -p "$(dirname "${PID_FILE}")"
+
+# Logging function
+log() {
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" | tee -a "${LOG_FILE}"
+}
+
+# Signal handlers
+cleanup() {
+    log "Received termination signal, shutting down gracefully..."
+    if [[ -f "${PID_FILE}" ]]; then
+        rm -f "${PID_FILE}"
+    fi
+    exit 0
+}
+
+trap cleanup SIGTERM SIGINT
+
+# Check if config exists
+if [[ ! -f "${CONFIG_PATH}" ]]; then
+    log "ERROR: Configuration file not found: ${CONFIG_PATH}"
+    log "Creating default configuration..."
+    
+    # Create default config
+    cat > "${CONFIG_PATH}" << 'EOF'
+{
+    "current_voltage": 7,
+    "current_fan_speed": 50,
+    "pump_is_off": false,
+    "fan_is_off": false,
+    "rgb_state": 1,
+    "rgb_is_off": false,
+    "rgb_color": [255, 0, 0],
+    "auto_start": true,
+    "auto_connect": true
+}
+EOF
+    chmod 644 "${CONFIG_PATH}"
+    log "Default configuration created at ${CONFIG_PATH}"
+fi
+
+# Store PID
+echo $$ > "${PID_FILE}"
+
+log "Starting Watercooler Manager daemon..."
+log "Configuration: ${CONFIG_PATH}"
+log "Log file: ${LOG_FILE}"
+log "PID: $$"
+
+# Set environment for daemon mode
+export WATERCOOLER_DAEMON_MODE=1
+export WATERCOOLER_CONFIG_PATH="${CONFIG_PATH}"
+
+# Start the application
+exec python3 -m watercooler_manager 2>&1 | while IFS= read -r line; do
+    log "APP: $line"
+done

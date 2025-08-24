@@ -1,0 +1,29 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Watercooler Manager
+Comment=Manage LCT water coolers via Bluetooth
+GenericName=Water Cooler Manager
+Keywords=watercooler;cooling;bluetooth;system;tray;
+Icon=watercooler-manager
+Exec=watercooler-manager
+Terminal=false
+StartupNotify=true
+Categories=System;Monitor;HardwareSettings;
+StartupWMClass=watercooler-manager
+
+# Additional metadata
+MimeType=
+Actions=daemon-start;daemon-stop;daemon-status;
+
+[Desktop Action daemon-start]
+Name=Start Daemon
+Exec=systemctl --user start watercooler-manager.service
+
+[Desktop Action daemon-stop]
+Name=Stop Daemon
+Exec=systemctl --user stop watercooler-manager.service
+
+[Desktop Action daemon-status]
+Name=Check Daemon Status
+Exec=systemctl --user status watercooler-manager.service
