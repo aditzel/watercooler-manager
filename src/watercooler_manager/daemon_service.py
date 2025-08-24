@@ -20,36 +20,33 @@ except ImportError:
     GLib = None
 
 
-class WatercoolerDaemonService(dbus.service.Object if DBUS_AVAILABLE else object):
-    """D-Bus service for watercooler daemon"""
-    
-    SERVICE_NAME = "org.watercooler.Manager"
-    OBJECT_PATH = "/org/watercooler/Manager"
-    INTERFACE_NAME = "org.watercooler.Manager"
-    
-    def __init__(self, watercooler_manager):
-        if not DBUS_AVAILABLE:
-            print("D-Bus not available, daemon will run without D-Bus interface")
-            return
-            
-        self.watercooler_manager = watercooler_manager
-        self.device = watercooler_manager.device
-        self.settings = watercooler_manager.settings
-        
-        # Initialize D-Bus
-        DBusGMainLoop(set_as_default=True)
-        self.bus = dbus.SessionBus()
-        
-        # Request service name
-        bus_name = dbus.service.BusName(self.SERVICE_NAME, self.bus)
-        super().__init__(bus_name, self.OBJECT_PATH)
-        
-        print(f"✅ D-Bus service started: {self.SERVICE_NAME}")
-    
-    @dbus.service.method(INTERFACE_NAME, out_signature='s')
-    def ping(self):
-        """Ping method for connection testing"""
-        return "pong"
+if DBUS_AVAILABLE:
+    class WatercoolerDaemonService(dbus.service.Object):
+        """D-Bus service for watercooler daemon"""
+
+        SERVICE_NAME = "org.watercooler.Manager"
+        OBJECT_PATH = "/org/watercooler/Manager"
+        INTERFACE_NAME = "org.watercooler.Manager"
+
+        def __init__(self, watercooler_manager):
+            self.watercooler_manager = watercooler_manager
+            self.device = watercooler_manager.device
+            self.settings = watercooler_manager.settings
+
+            # Initialize D-Bus
+            DBusGMainLoop(set_as_default=True)
+            self.bus = dbus.SessionBus()
+
+            # Request service name
+            bus_name = dbus.service.BusName(self.SERVICE_NAME, self.bus)
+            super().__init__(bus_name, self.OBJECT_PATH)
+
+            print(f"✅ D-Bus service started: {self.SERVICE_NAME}")
+
+        @dbus.service.method(INTERFACE_NAME, out_signature='s')
+        def ping(self):
+            """Ping method for connection testing"""
+            return "pong"
     
     @dbus.service.method(INTERFACE_NAME, out_signature='s')
     def get_status(self):
@@ -242,6 +239,15 @@ class WatercoolerDaemonService(dbus.service.Object if DBUS_AVAILABLE else object
                 self._emit_status_changed()
         except Exception as e:
             print(f"Error disconnecting from device: {e}")
+
+else:
+    # Fallback class when D-Bus is not available
+    class WatercoolerDaemonService:
+        """Fallback daemon service without D-Bus"""
+
+        def __init__(self, watercooler_manager):
+            print("D-Bus not available, daemon will run without D-Bus interface")
+            self.watercooler_manager = watercooler_manager
 
 
 def start_glib_main_loop():
