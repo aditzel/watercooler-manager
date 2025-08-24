@@ -46,6 +46,10 @@ dependencies = [
 linux = [
     "PyGObject>=3.42.0",
     "pycairo>=1.20.0",
+    # Note: python-dbus is a system package, install via:
+    # Arch: sudo pacman -S python-dbus
+    # Ubuntu: sudo apt install python3-dbus
+    # Fedora: sudo dnf install python3-dbus
 ]
 dev = [
     "pytest>=7.0",
@@ -63,6 +67,7 @@ Documentation = "https://github.com/tomups/watercooler-manager/blob/main/README.
 
 [project.scripts]
 watercooler-manager = "watercooler_manager:main"
+watercooler-manager-gui = "watercooler_manager.gui_client:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}

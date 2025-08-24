@@ -15,6 +15,7 @@ depends=(
     'python-typing_extensions>=4.12.0'
     'python-gobject>=3.42.0'
     'python-cairo>=1.20.0'
+    'python-dbus'
     'gtk3>=3.12'
     'libappindicator-gtk3'
     'gir1.2-notify-0.7'

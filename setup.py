@@ -44,6 +44,7 @@ setup(
     entry_points={
         "console_scripts": [
             "watercooler-manager=watercooler_manager:main",
+            "watercooler-manager-gui=watercooler_manager.gui_client:main",
         ],
     },
     

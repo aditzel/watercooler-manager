@@ -8,6 +8,8 @@ from .device import WaterCoolingDevice
 from .settings import Settings
 from .tray import SystemTrayIcon
 from .enums import PumpVoltage, RGBState
+from .daemon_service import WatercoolerDaemonService, start_glib_main_loop, DBUS_AVAILABLE
+from .daemon_client import DaemonClient
 import pystray
 
 class WaterCoolerManager:
@@ -18,26 +20,50 @@ class WaterCoolerManager:
         self.daemon_mode = self.settings.daemon_mode
         self.running = True
         self.version = version if version is not None else "v1.2.0"
+        self.daemon_service = None
+        self.daemon_client = None
 
-        # Only create tray icon if not in daemon mode
-        if not self.daemon_mode:
-            self.tray = SystemTrayIcon(
-                on_connect=self.connect_menu,
-                on_disconnect=self.disconnect_menu,
-                on_pump_settings=self.handle_pump_settings,
-                on_fan_settings=self.handle_fan_settings,
-                on_rgb_settings=self.handle_rgb_settings,
-                on_autostart_settings=self.handle_autostart_settings,
-                on_autoconnect_settings=self.handle_autoconnect_settings,
-                on_exit=self.exit_app,
-                settings=self.settings,
-                version=self.version
-            )
-        else:
+        # Setup based on mode
+        if self.daemon_mode:
+            # Daemon mode: Setup D-Bus service and signal handlers
             self.tray = None
-            # Setup signal handlers for daemon mode
+            if DBUS_AVAILABLE:
+                self.daemon_service = WatercoolerDaemonService(self)
             signal.signal(signal.SIGTERM, self._signal_handler)
             signal.signal(signal.SIGINT, self._signal_handler)
+        else:
+            # GUI mode: Try to connect to daemon first, fallback to direct control
+            self.daemon_client = DaemonClient()
+            daemon_connected = self.daemon_client.connect()
+
+            if daemon_connected:
+                print("✅ Connected to daemon, GUI will control via D-Bus")
+                self.tray = SystemTrayIcon(
+                    on_connect=self.connect_menu_via_daemon,
+                    on_disconnect=self.disconnect_menu_via_daemon,
+                    on_pump_settings=self.handle_pump_settings_via_daemon,
+                    on_fan_settings=self.handle_fan_settings_via_daemon,
+                    on_rgb_settings=self.handle_rgb_settings_via_daemon,
+                    on_autostart_settings=self.handle_autostart_settings,
+                    on_autoconnect_settings=self.handle_autoconnect_settings,
+                    on_exit=self.exit_app,
+                    settings=self.settings,
+                    version=self.version
+                )
+            else:
+                print("ℹ️  No daemon found, GUI will control device directly")
+                self.tray = SystemTrayIcon(
+                    on_connect=self.connect_menu,
+                    on_disconnect=self.disconnect_menu,
+                    on_pump_settings=self.handle_pump_settings,
+                    on_fan_settings=self.handle_fan_settings,
+                    on_rgb_settings=self.handle_rgb_settings,
+                    on_autostart_settings=self.handle_autostart_settings,
+                    on_autoconnect_settings=self.handle_autoconnect_settings,
+                    on_exit=self.exit_app,
+                    settings=self.settings,
+                    version=self.version
+                )
 
     def _signal_handler(self, signum, frame):
         """Handle shutdown signals in daemon mode"""
@@ -75,9 +101,16 @@ class WaterCoolerManager:
         """Run in daemon mode without GUI"""
         print(f"Starting Watercooler Manager daemon v{self.version}")
         print(f"Configuration: {self.settings.config_path}")
+        print(f"D-Bus service: {'Available' if DBUS_AVAILABLE else 'Not available'}")
 
         # Setup and start the event loop
         asyncio.set_event_loop(self.loop)
+
+        # Start D-Bus main loop in separate thread if available
+        if DBUS_AVAILABLE and self.daemon_service:
+            dbus_thread = threading.Thread(target=start_glib_main_loop, daemon=True)
+            dbus_thread.start()
+            print("✅ D-Bus service thread started")
 
         # Auto connect on startup
         if self.settings.auto_connect:
@@ -131,6 +164,34 @@ class WaterCoolerManager:
             self.loop.close()
 
         print("Cleanup complete")
+
+    # Daemon client methods for GUI mode
+    def connect_menu_via_daemon(self):
+        """Connect via daemon"""
+        if self.daemon_client and self.daemon_client.is_connected():
+            self.daemon_client.connect_device()
+
+    def disconnect_menu_via_daemon(self):
+        """Disconnect via daemon"""
+        if self.daemon_client and self.daemon_client.is_connected():
+            self.daemon_client.disconnect_device()
+
+    def handle_pump_settings_via_daemon(self, voltage: PumpVoltage):
+        """Handle pump settings via daemon"""
+        if self.daemon_client and self.daemon_client.is_connected():
+            self.daemon_client.set_pump_voltage(voltage)
+
+    def handle_fan_settings_via_daemon(self, speed: int):
+        """Handle fan settings via daemon"""
+        if self.daemon_client and self.daemon_client.is_connected():
+            self.daemon_client.set_fan_speed(speed)
+
+    def handle_rgb_settings_via_daemon(self, state: RGBState, color: tuple = None):
+        """Handle RGB settings via daemon"""
+        if self.daemon_client and self.daemon_client.is_connected():
+            self.daemon_client.set_rgb_state(state)
+            if color:
+                self.daemon_client.set_rgb_color(*color)
 
     def exit_app(self):
         future = asyncio.run_coroutine_threadsafe(self.device.disconnect(), self.loop)

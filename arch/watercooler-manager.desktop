@@ -14,14 +14,18 @@ StartupWMClass=watercooler-manager
 
 # Additional metadata
 MimeType=
-Actions=daemon-start;daemon-stop;daemon-status;
+Actions=gui-client;daemon-start;daemon-stop;daemon-status;
+
+[Desktop Action gui-client]
+Name=GUI Client (Connect to Daemon)
+Exec=watercooler-manager-gui
 
 [Desktop Action daemon-start]
-Name=Start Daemon
+Name=Start User Daemon
 Exec=systemctl --user start watercooler-manager.service
 
 [Desktop Action daemon-stop]
-Name=Stop Daemon
+Name=Stop User Daemon
 Exec=systemctl --user stop watercooler-manager.service
 
 [Desktop Action daemon-status]
