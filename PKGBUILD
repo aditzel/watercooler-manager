@@ -7,18 +7,13 @@ arch=('x86_64')
 url="https://github.com/tomups/watercooler-manager"
 license=('MIT')
 depends=(
-    'python>=3.9'
-    'python-bleak>=0.22.0'
-    'python-pillow>=11.0.0'
-    'python-pystray>=0.19.0'
-    'python-six>=1.17.0'
-    'python-typing_extensions>=4.12.0'
-    'python-gobject>=3.42.0'
-    'python-cairo>=1.20.0'
+    'python'
+    'python-gobject'
+    'python-cairo'
     'python-dbus'
-    'gtk3>=3.12'
+    'gtk3'
     'libappindicator-gtk3'
-    'gir1.2-notify-0.7'
+    'libnotify'
 )
 makedepends=(
     'python-build'
@@ -29,6 +24,7 @@ makedepends=(
 optdepends=(
     'systemd: for daemon functionality'
     'polkit: for device access permissions'
+    'python-pip: for installing Python dependencies (bleak, pystray, etc.)'
 )
 backup=(
     'etc/watercooler-manager/config.json'
@@ -37,8 +33,8 @@ source=()
 sha256sums=()
 
 prepare() {
-    # Copy current directory contents to srcdir for building
-    cp -r "${startdir}"/* "${srcdir}/" || true
+    # Copy source files to srcdir for building (exclude build artifacts)
+    rsync -av --exclude='*.pkg.tar.zst' --exclude='build/' --exclude='dist/' --exclude='src/build/' --exclude='src/dist/' --exclude='usr/' --exclude='test_env/' "${startdir}"/ "${srcdir}/"
 
     # Modern Python packaging uses pyproject.toml (already included)
     # No need to generate setup.py
@@ -108,6 +104,13 @@ post_install() {
     # Reload udev rules
     udevadm control --reload-rules 2>/dev/null || true
     udevadm trigger 2>/dev/null || true
+
+    # Install Python dependencies
+    echo "==> Installing Python dependencies..."
+    pip install --break-system-packages bleak==0.22.3 pillow==11.0.0 pystray==0.19.5 six==1.17.0 typing_extensions==4.12.2 2>/dev/null || {
+        echo "⚠️  Failed to install Python dependencies automatically"
+        echo "    Please install manually: pip install bleak pillow pystray six typing_extensions"
+    }
 
     echo "==> Watercooler Manager installed successfully!"
     echo ""
