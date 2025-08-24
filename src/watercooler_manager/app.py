@@ -1,5 +1,9 @@
 import asyncio
 import threading
+import os
+import signal
+import sys
+import time
 from .device import WaterCoolingDevice
 from .settings import Settings
 from .tray import SystemTrayIcon
@@ -11,25 +15,50 @@ class WaterCoolerManager:
         self.settings = Settings()
         self.device = WaterCoolingDevice()
         self.loop = asyncio.new_event_loop()
-        self.tray = SystemTrayIcon(
-            on_connect=self.connect_menu,
-            on_disconnect=self.disconnect_menu,
-            on_pump_settings=self.handle_pump_settings,
-            on_fan_settings=self.handle_fan_settings,
-            on_rgb_settings=self.handle_rgb_settings,
-            on_autostart_settings=self.handle_autostart_settings,
-            on_autoconnect_settings=self.handle_autoconnect_settings,
-            on_exit=self.exit_app,
-            settings=self.settings,
-            version=version if version is not None else "v1.0.0"
-        )
+        self.daemon_mode = self.settings.daemon_mode
+        self.running = True
+        self.version = version if version is not None else "v1.2.0"
+
+        # Only create tray icon if not in daemon mode
+        if not self.daemon_mode:
+            self.tray = SystemTrayIcon(
+                on_connect=self.connect_menu,
+                on_disconnect=self.disconnect_menu,
+                on_pump_settings=self.handle_pump_settings,
+                on_fan_settings=self.handle_fan_settings,
+                on_rgb_settings=self.handle_rgb_settings,
+                on_autostart_settings=self.handle_autostart_settings,
+                on_autoconnect_settings=self.handle_autoconnect_settings,
+                on_exit=self.exit_app,
+                settings=self.settings,
+                version=self.version
+            )
+        else:
+            self.tray = None
+            # Setup signal handlers for daemon mode
+            signal.signal(signal.SIGTERM, self._signal_handler)
+            signal.signal(signal.SIGINT, self._signal_handler)
+
+    def _signal_handler(self, signum, frame):
+        """Handle shutdown signals in daemon mode"""
+        print(f"Received signal {signum}, shutting down gracefully...")
+        self.running = False
+        if self.loop and not self.loop.is_closed():
+            self.loop.call_soon_threadsafe(self.loop.stop)
 
     def run(self):
+        if self.daemon_mode:
+            self._run_daemon()
+        else:
+            self._run_gui()
+
+    def _run_gui(self):
+        """Run in GUI mode with system tray"""
         # Setup and start the event loop in a separate thread
         def run_event_loop():
             asyncio.set_event_loop(self.loop)
             self.loop.run_forever()
-        
+
         loop_thread = threading.Thread(target=run_event_loop, daemon=True)
         loop_thread.start()
 
@@ -41,6 +70,67 @@ class WaterCoolerManager:
             asyncio.run_coroutine_threadsafe(self.connect_and_run(), self.loop)
 
         self.tray.run()
+
+    def _run_daemon(self):
+        """Run in daemon mode without GUI"""
+        print(f"Starting Watercooler Manager daemon v{self.version}")
+        print(f"Configuration: {self.settings.config_path}")
+
+        # Setup and start the event loop
+        asyncio.set_event_loop(self.loop)
+
+        # Auto connect on startup
+        if self.settings.auto_connect:
+            self.loop.create_task(self.connect_and_run())
+
+        # Start monitoring loop
+        self.loop.create_task(self._daemon_monitor_loop())
+
+        try:
+            self.loop.run_forever()
+        except KeyboardInterrupt:
+            print("Received keyboard interrupt, shutting down...")
+        finally:
+            self._cleanup()
+
+    async def _daemon_monitor_loop(self):
+        """Main monitoring loop for daemon mode"""
+        print("Daemon monitoring loop started")
+
+        while self.running:
+            try:
+                # Check device status every 30 seconds
+                if self.device.is_connected:
+                    # You could add periodic health checks here
+                    pass
+                else:
+                    # Try to reconnect if auto_connect is enabled
+                    if self.settings.auto_connect:
+                        print("Device disconnected, attempting to reconnect...")
+                        await self.connect_and_run()
+
+                await asyncio.sleep(30)
+
+            except Exception as e:
+                print(f"Error in daemon monitor loop: {e}")
+                await asyncio.sleep(5)
+
+        print("Daemon monitoring loop stopped")
+
+    def _cleanup(self):
+        """Cleanup resources"""
+        print("Cleaning up resources...")
+        if self.device:
+            try:
+                future = asyncio.run_coroutine_threadsafe(self.device.disconnect(), self.loop)
+                future.result(timeout=5)
+            except Exception as e:
+                print(f"Error during cleanup: {e}")
+
+        if self.loop and not self.loop.is_closed():
+            self.loop.close()
+
+        print("Cleanup complete")
 
     def exit_app(self):
         future = asyncio.run_coroutine_threadsafe(self.device.disconnect(), self.loop)

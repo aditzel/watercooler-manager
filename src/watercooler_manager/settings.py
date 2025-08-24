@@ -16,6 +16,7 @@ if platform.system() == 'Windows':
 class Settings:
     REGISTRY_KEY = r"Software\WaterCooler"
     CONFIG_FILE = os.path.expanduser("~/.watercooler.json")
+    SYSTEM_CONFIG_FILE = "/etc/watercooler-manager/config.json"
 
     def __init__(self):
         self.current_voltage = PumpVoltage.V7
@@ -27,7 +28,18 @@ class Settings:
         self.rgb_color = (255, 0, 0)  # Default red
         self.auto_start = False
         self.auto_connect = False
+        self.daemon_mode = os.getenv('WATERCOOLER_DAEMON_MODE', '0') == '1'
+        self.config_path = os.getenv('WATERCOOLER_CONFIG_PATH', self._get_default_config_path())
         self.load()
+
+    def _get_default_config_path(self):
+        """Get the default configuration file path based on mode and system"""
+        if platform.system() == 'Windows':
+            return None  # Use registry on Windows
+        elif self.daemon_mode and os.path.exists(self.SYSTEM_CONFIG_FILE):
+            return self.SYSTEM_CONFIG_FILE
+        else:
+            return self.CONFIG_FILE
 
     def load(self):
         if platform.system() == 'Windows':
@@ -76,23 +88,30 @@ class Settings:
             pass
 
     def _load_from_file(self):
+        config_file = self.config_path or self.CONFIG_FILE
         try:
-            with open(self.CONFIG_FILE, 'r') as f:
+            with open(config_file, 'r') as f:
                 config = json.load(f)
-                self.current_voltage = PumpVoltage(config['current_voltage'])
-                self.current_fan_speed = config['current_fan_speed']
-                self.pump_is_off = config['pump_is_off']
-                self.fan_is_off = config['fan_is_off']
-                self.rgb_state = RGBState(config['rgb_state'])
-                self.rgb_is_off = config['rgb_is_off']
-                self.rgb_color = tuple(config['rgb_color'])
-                self.auto_start = config['auto_start']
-                self.auto_connect = config['auto_connect']
-        except:
+                self.current_voltage = PumpVoltage(config.get('current_voltage', self.current_voltage))
+                self.current_fan_speed = config.get('current_fan_speed', self.current_fan_speed)
+                self.pump_is_off = config.get('pump_is_off', self.pump_is_off)
+                self.fan_is_off = config.get('fan_is_off', self.fan_is_off)
+                self.rgb_state = RGBState(config.get('rgb_state', self.rgb_state))
+                self.rgb_is_off = config.get('rgb_is_off', self.rgb_is_off)
+                self.rgb_color = tuple(config.get('rgb_color', self.rgb_color))
+                self.auto_start = config.get('auto_start', self.auto_start)
+                self.auto_connect = config.get('auto_connect', self.auto_connect)
+        except Exception as e:
+            if self.daemon_mode:
+                print(f"Warning: Could not load config from {config_file}: {e}")
             pass
 
     def _save_to_file(self):
+        config_file = self.config_path or self.CONFIG_FILE
         try:
+            # Ensure directory exists
+            os.makedirs(os.path.dirname(config_file), exist_ok=True)
+
             config = {
                 'current_voltage': self.current_voltage,
                 'current_fan_speed': self.current_fan_speed,
@@ -104,10 +123,12 @@ class Settings:
                 'auto_start': self.auto_start,
                 'auto_connect': self.auto_connect
             }
-            with open(self.CONFIG_FILE, 'w') as f:
-                json.dump(config, f)
-        except:
-            pass 
+            with open(config_file, 'w') as f:
+                json.dump(config, f, indent=2)
+        except Exception as e:
+            if self.daemon_mode:
+                print(f"Warning: Could not save config to {config_file}: {e}")
+            pass
 
     def set_autostart(self, autostart: bool):
         self.auto_start = autostart
